@@ -1,32 +1,27 @@
 package server
 
 import (
-	"fmt"
+	"net/http"
 
-	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/gorilla/mux"
 	"github.com/olawolu/zk-pass/data"
+	"github.com/olawolu/zk-pass/logger"
 )
 
-type Server struct {
-	webAuthn  *webauthn.WebAuthn
-	datastore *data.Datastore
-	session   *SessionManager
+func NewServer(
+	config *Config,
+	logger *logger.Logger,
+	datastore *data.Datastore,
+	sessionStore *SessionManager,
+) http.Handler {
+	mux := mux.NewRouter()
+	initRoutes(mux, config, datastore, sessionStore)
+
+	var handler http.Handler = mux
+	// add some middleware
+	return handler
 }
 
-func NewServer() *Server {
-	wconfig := &webauthn.Config{
-		RPDisplayName: "Go Webauthn",                               // Display Name for your site
-		RPID:          "go-webauthn.local",                         // Generally the FQDN for your site
-		RPOrigins:     []string{"https://login.go-webauthn.local"}, // The origin URLs allowed for WebAuthn requests
-	}
-
-	webAuthn, err := webauthn.New(wconfig)
-	if err != nil {
-		fmt.Println(err)
-		return nil
-	}
-
-	return &Server{
-		webAuthn: webAuthn,
-	}
-}
+// func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// 	s.router.ServeHTTP(w, r)
+// }

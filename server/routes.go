@@ -4,91 +4,144 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/gorilla/mux"
+	"github.com/olawolu/zk-pass/data"
 )
 
-func (s *Server) BeginRegistration(w http.ResponseWriter, r *http.Request) {
-	user := s.datastore.GetUser() // Find or create the new user
-	options, session, err := s.webAuthn.BeginRegistration(user)
+func initRoutes(
+	mux *mux.Router,
+	config *Config,
+	datastore *data.Datastore,
+	sessionStore *SessionManager,
+) {
+	mux.Handle("/", http.NotFoundHandler())
+
+	// register a new passkey
+	registry := mux.PathPrefix("/register").Subrouter()
+	registry.Handle("/initiate", beginRegistration(config, datastore, sessionStore))
+	registry.HandleFunc("/finish", finishRegistration(config, datastore, sessionStore))
+
+	// authenticate registered passkeys
+	auth := mux.PathPrefix("auth").Subrouter()
+	auth.HandleFunc("/initiate", beginLogin(config, datastore, sessionStore))
+	auth.HandleFunc("/finish", finishLogin(config, datastore, sessionStore))
+}
+
+func beginRegistration(config *Config, datastore *data.Datastore, sessionStore *SessionManager) http.HandlerFunc {
+	webAuthn, err := webauthn.New(config.webauthn)
 	if err != nil {
 		fmt.Println(err)
+		return nil
 	}
-	// store the sessionData values
-	s.session.SaveSession(w, r, session)
-	JSONResponse(w, options, http.StatusOK) // return the options generated
-	// options.publicKey contain our registration options
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := datastore.GetUser() // Find or create the new user
+		options, session, err := webAuthn.BeginRegistration(user)
+		if err != nil {
+			fmt.Println(err)
+		}
+		// store the sessionData values
+		sessionStore.SaveSession(w, r, session)
+		encode(w, http.StatusOK, options) // return the options generated
+		// optionpublicKey contain our registration options
+	}
 }
 
-func (s *Server) FinishRegistration(w http.ResponseWriter, r *http.Request) {
-	user := s.datastore.GetUser() // Get the user
-
-	// Get the session data stored from the function above
-	session := s.session.GetSession(r, "key")
-
-	credential, err := s.webAuthn.FinishRegistration(user, session, r)
+func finishRegistration(config *Config, datastore *data.Datastore, sessionStore *SessionManager) http.HandlerFunc {
+	webAuthn, err := webauthn.New(config.webauthn)
 	if err != nil {
-		// Handle Error and return.
-		return
+		fmt.Println(err)
+		return nil
 	}
+	return func(w http.ResponseWriter, r *http.Request) {
 
-	// If creation was successful, store the credential object
-	// Pseudocode to add the user credential.
-	user.AddCredential(credential)
-	s.datastore.SaveUser(user)
+		user := datastore.GetUser() // Get the user
 
-	JSONResponse(w, "Registration Success", http.StatusOK) // Handle next steps
+		// Get the session data stored from the function above
+		session := sessionStore.GetSession(r, "key")
+
+		credential, err := webAuthn.FinishRegistration(user, session, r)
+		if err != nil {
+			// Handle Error and return.
+			return
+		}
+
+		// If creation was successful, store the credential object
+		// Pseudocode to add the user credential.
+		user.AddCredential(credential)
+		datastore.SaveUser(user)
+
+		encode(w, http.StatusOK, "Registration Success") // Handle next steps
+	}
 }
 
-func (s *Server) BeginLogin(w http.ResponseWriter, r *http.Request) {
-	user := s.datastore.GetUser() // Find the user
-
-	options, session, err := s.webAuthn.BeginLogin(user)
+func beginLogin(config *Config, datastore *data.Datastore, sessionStore *SessionManager) http.HandlerFunc {
+	webAuthn, err := webauthn.New(config.webauthn)
 	if err != nil {
-		// Handle Error and return.
-
-		return
+		fmt.Println(err)
+		return nil
 	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := datastore.GetUser() // Find the user
 
-	// store the session values
-	s.session.SaveSession(w, r, session)
+		options, session, err := webAuthn.BeginLogin(user)
+		if err != nil {
+			// Handle Error and return.
 
-	JSONResponse(w, options, http.StatusOK) // return the options generated
-	// options.publicKey contain our registration options
+			return
+		}
+
+		// store the session values
+		sessionStore.SaveSession(w, r, session)
+
+		encode(w, http.StatusOK, options) // return the options generated
+		// optionpublicKey contain our registration options
+	}
 }
 
-func (s *Server) FinishLogin(w http.ResponseWriter, r *http.Request) {
-	user := s.datastore.GetUser() // Get the user
-
-	// Get the session data stored from the function above
-	session := s.session.GetSession(r, "key")
-
-	credential, err := s.webAuthn.FinishLogin(user, session, r)
+func finishLogin(config *Config, datastore *data.Datastore, sessionStore *SessionManager) http.HandlerFunc {
+	webAuthn, err := webauthn.New(config.webauthn)
 	if err != nil {
-		// Handle Error and return.
-
-		return
+		fmt.Println(err)
+		return nil
 	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		user := datastore.GetUser() // Get the user
 
-	// Handle credential.Authenticator.CloneWarning
+		// Get the session data stored from the function above
+		session := sessionStore.GetSession(r, "key")
 
-	// If login was successful, update the credential object
-	// Pseudocode to update the user credential.
-	user.UpdateCredential(credential)
-	s.datastore.SaveUser(user)
+		credential, err := webAuthn.FinishLogin(user, session, r)
+		if err != nil {
+			// Handle Error and return.
+			return
+		}
 
-	JSONResponse(w, "Login Success", http.StatusOK)
+		// Handle credential.Authenticator.CloneWarning
+
+		// If login was successful, update the credential object
+		// Pseudocode to update the user credential.
+		user.UpdateCredential(credential)
+		datastore.SaveUser(user)
+
+		encode(w, http.StatusOK, "Login Success")
+	}
 }
 
-func JSONResponse(w http.ResponseWriter, data interface{}, statusCode int) {
-	// Set the content type to application/json
+func encode[T any](w http.ResponseWriter, status int, v T) error {
 	w.Header().Set("Content-Type", "application/json")
-
-	// Set the HTTP status code
-	w.WriteHeader(statusCode)
-
-	// Encode the data as JSON and write it to the response
-	err := json.NewEncoder(w).Encode(data)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		return fmt.Errorf("encode json: %w", err)
 	}
+	return nil
+}
+
+func decode[T any](r *http.Request) (T, error) {
+	var v T
+	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+		return v, fmt.Errorf("decode json: %w", err)
+	}
+	return v, nil
 }
