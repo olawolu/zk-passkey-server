@@ -25,16 +25,16 @@ func NewSessionManager() *SessionManager {
 	}
 }
 func (sm *SessionManager) GetSession(r *http.Request, key string) webauthn.SessionData {
-	session, err := sm.store.Get(r, "session-key")
+	session, err := sm.store.Get(r, key)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 
-	return 	storeValueToSessionData(session.Values)
+	return storeValueToSessionData(session.Values)
 }
 
-func (sm *SessionManager) SaveSession(w http.ResponseWriter, r *http.Request, sessionData *webauthn.SessionData) {
-	session, err := sm.store.Get(r, "session-key")
+func (sm *SessionManager) SaveSession(w http.ResponseWriter, r *http.Request, sessionData *webauthn.SessionData, key string) {
+	session, err := sm.store.Get(r, key)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -47,6 +47,7 @@ func (sm *SessionManager) SaveSession(w http.ResponseWriter, r *http.Request, se
 	session.Values["user_ver"] = sessionData.UserVerification
 	session.Values["extensions"] = sessionData.Extensions
 
+	session.Options.MaxAge = 0
 	if err = session.Save(r, w); err != nil {
 		log.Fatalf("Error saving session: %v", err)
 	}

@@ -1,11 +1,17 @@
 package data
 
-import "github.com/go-webauthn/webauthn/webauthn"
+import (
+	"encoding/base64"
 
+	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/google/uuid"
+)
 
 type User struct {
-	UserId        string
-	PasskeyUserId string
+	UserId        uuid.UUID //unique database user id
+	Username      string
+	PasskeyUserId string // passkeyUserId
+	Credential    *webauthn.Credential
 }
 
 // WebAuthnID provides the user handle of the user account. A user handle is an opaque byte sequence with a maximum
@@ -18,7 +24,8 @@ type User struct {
 //
 // Specification: §5.4.3. User Account Parameters for Credential Generation (https://w3c.github.io/webauthn/#dom-publickeycredentialuserentity-id)
 func (u User) WebAuthnID() []byte {
-	return nil
+	uid, _ := base64.RawURLEncoding.DecodeString(u.PasskeyUserId)
+	return uid
 }
 
 // WebAuthnName provides the name attribute of the user account during registration and is a human-palatable name for the user
@@ -27,7 +34,7 @@ func (u User) WebAuthnID() []byte {
 //
 // Specification: §5.4.3. User Account Parameters for Credential Generation (https://w3c.github.io/webauthn/#dictdef-publickeycredentialuserentity)
 func (u User) WebAuthnName() string {
-	return ""
+	return u.Username
 }
 
 // WebAuthnDisplayName provides the name attribute of the user account during registration and is a human-palatable
@@ -36,7 +43,7 @@ func (u User) WebAuthnName() string {
 //
 // Specification: §5.4.3. User Account Parameters for Credential Generation (https://www.w3.org/TR/webauthn/#dom-publickeycredentialuserentity-displayname)
 func (u User) WebAuthnDisplayName() string {
-	return ""
+	return u.Username
 }
 
 // WebAuthnCredentials provides the list of Credential objects owned by the user.
@@ -44,9 +51,9 @@ func (u User) WebAuthnCredentials() []webauthn.Credential {
 	return nil
 }
 
-func (u *User) AddCredential(credential *webauthn.Credential) {
+// func (u *User) AddCredential(credential *webauthn.Credential) {
 
-}
-func (u *User) UpdateCredential(credential *webauthn.Credential)  {
-	
+// }
+func (u *User) UpdateCredential(credential *webauthn.Credential) {
+
 }

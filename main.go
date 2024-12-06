@@ -37,6 +37,7 @@ func run(
 
 	host := getenv("host")
 	port := getenv("port")
+	// setup databse
 	logger := logger.NewLogger()
 	config := server.ServerConfig(host, port)
 	serverInstance := server.NewServer(nil, logger, nil, nil)
