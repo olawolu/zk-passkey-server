@@ -43,30 +43,30 @@ func beginRegistration(
 	type registrationOptions struct {
 		username string
 	}
-
-	webAuthn, err := webauthn.New(config.webauthn)
-	if err != nil {
-		logger.Error(err.Error())
-		return nil
-	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		regOpts, err := decodeRequestBody[registrationOptions](r)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error(r.Context(), err.Error())
 			encodeJsonValue(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 
 		user, err := datastore.RegisterNewUser(regOpts.username)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error(r.Context(), err.Error())
 			encodeJsonValue(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		webAuthn, err := webauthn.New(config.webauthn)
+		if err != nil {
+			logger.Error(r.Context(), err.Error())
 			return
 		}
 
 		creationOptions, session, err := webAuthn.BeginRegistration(user)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error(r.Context(), err.Error())
 		}
 		sessionStore.SaveSession(w, r, session, user.UserId.String())
 		encodeJsonValue(w, http.StatusOK, creationOptions) // return the options generated
@@ -90,20 +90,20 @@ func finishRegistration(
 
 		webAuthn, err := webauthn.New(config.webauthn)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error(r.Context(), err.Error())
 			return
 		}
 		protocol.ParseCredentialCreationResponseBody(r.Body)
 		credential, err := webAuthn.FinishRegistration(user, session, r)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error(r.Context(), err.Error())
 			// Handle Error and return.
 			return
 		}
 
 		err = datastore.AddCredential(credential, user.UserId, r.UserAgent())
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error(r.Context(), err.Error())
 			// Handle Error and return.
 			return
 		}
@@ -126,14 +126,14 @@ func beginLogin(
 
 		// loginOpts, err := decodeRequestBody[loginOptions](r)
 		// if err != nil {
-		// 	logger.Error(err.Error())
+		// 	logger.Error(r.Context(),err.Error())
 		// }
 
 		user, _ := datastore.GetUser(userId) // Find the user
 
 		webAuthn, err := webauthn.New(config.webauthn)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error(r.Context(), err.Error())
 			return
 		}
 
@@ -145,7 +145,7 @@ func beginLogin(
 		options, session, err := webAuthn.BeginLogin(user)
 		if err != nil {
 			// Handle Error and return.
-			logger.Error(err.Error())
+			logger.Error(r.Context(), err.Error())
 			return
 		}
 		// store the session values
@@ -169,7 +169,7 @@ func finishLogin(
 	return func(w http.ResponseWriter, r *http.Request) {
 		loginOpts, err := decodeRequestBody[loginOptions](r)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error(r.Context(), err.Error())
 		}
 		user, _ := datastore.GetUser(loginOpts.userId)
 		session := sessionStore.GetSession(r, loginOpts.passkey)
@@ -181,7 +181,7 @@ func finishLogin(
 		}
 		credential, err := webAuthn.FinishLogin(user, session, r)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error(r.Context(), err.Error())
 			return
 		}
 

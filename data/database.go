@@ -8,11 +8,21 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 	"github.com/olawolu/zk-pass/data/models"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 type DB struct {
 	*gorm.DB
+}
+
+func NewDB(dbUrl string) *DB {
+	db, err := gorm.Open(postgres.Open(dbUrl), &gorm.Config{})
+	if err != nil {
+		panic(fmt.Errorf("error connecting to db: %v", err))
+	}
+
+	return &DB{db}
 }
 
 func (db *DB) RegisterNewUser(username string) (*User, error) {

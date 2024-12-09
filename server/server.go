@@ -22,8 +22,8 @@ func ServerConfig(host, port string) *Config {
 		RPOrigins:     []string{"https://login.go-webauthn.local"}, // The origin URLs allowed for WebAuthn requests
 	}
 	return &Config{
-		Host:     "",
-		Port:     "",
+		Host:     host,
+		Port:     port,
 		webauthn: wconfig,
 	}
 }
@@ -32,19 +32,19 @@ func NewServer(
 	config *Config,
 	logger *logger.Logger,
 	datastore *data.DB,
-	sessionStore *SessionManager,
 ) http.Handler {
 	mux := mux.NewRouter()
-	initRoutes(mux, config, datastore, sessionStore, logger)
+	// sessionStore := NewSessionManager()
+	initRoutes(mux, config, datastore, nil, logger)
 
 	var handler http.Handler = mux
 	// add some middleware
 	return handler
 }
 
-func loggingMiddleware(next http.Handler, logger *logger.Logger) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		logger.Info("Request received")
-		next.ServeHTTP(w, r)
-	})
-}
+// func loggingMiddleware(next http.Handler, logger *logger.Logger) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		logger.Info(,"Request received")
+// 		next.ServeHTTP(w, r)
+// 	})
+// }

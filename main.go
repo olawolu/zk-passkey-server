@@ -12,13 +12,14 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/olawolu/zk-pass/data"
 	"github.com/olawolu/zk-pass/logger"
 	"github.com/olawolu/zk-pass/server"
 )
 
 func main() {
 	ctx := context.Background()
-	if err := run(ctx, os.Getenv, os.Args); err != nil {
+	if err := run(ctx, os.Getenv); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
@@ -27,20 +28,22 @@ func main() {
 func run(
 	ctx context.Context,
 	getenv func(string) string,
-	args []string,
 ) error {
-	_, cancel := signal.NotifyContext(ctx, os.Interrupt)
+	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 	defer cancel()
 
-	appEnv := args[1]
+	appEnv := os.Getenv("APP_ENV")
 	setEnv(appEnv)
+	host := getenv("HOST")
+	port := getenv("PORT")
+	dbUrl := getenv("DATABASE_URL")
 
-	host := getenv("host")
-	port := getenv("port")
 	// setup databse
 	logger := logger.NewLogger()
+
 	config := server.ServerConfig(host, port)
-	serverInstance := server.NewServer(nil, logger, nil, nil)
+	database := data.NewDB(dbUrl)
+	serverInstance := server.NewServer(config, logger, database)
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort(config.Host, config.Port),
 		Handler: serverInstance,
@@ -64,6 +67,7 @@ func run(
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
 			fmt.Fprintf(os.Stderr, "error shutting down http server: %s\n", err)
 		}
+		fmt.Println("shutting down server")
 	}()
 	wg.Wait()
 
@@ -84,7 +88,9 @@ func setEnv(appEnv string) error {
 	case "production":
 		// env should already be set
 	default:
-		slog.Warn("Application environment was not specified with a recognised APP_ENV")
+		if err := loadBaseEnv(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
