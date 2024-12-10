@@ -1,17 +1,46 @@
-package data
+package models
 
 import (
 	"encoding/base64"
+	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type User struct {
-	UserId        uuid.UUID //unique database user id
-	Username      string
-	PasskeyUserId string // passkeyUserId
-	Credential    *webauthn.Credential
+	ID                   uuid.UUID `gorm:"primaryKey" `
+	PasskeyUserID        string
+	Username             string
+	CreatedAt            time.Time             `gorm:"index;type:timestamptz;not null;default:NOW()"`
+	UpdatedAt            time.Time             `gorm:"index;type:timestamptz"`
+	DeletedAt            gorm.DeletedAt        `gorm:"index"`
+	PublicKeyCredentials []PublicKeyCredential `gorm:"foreignKey:PasskeyUserID"`
+}
+
+// PublicKeyCredential []PublicKeyCredential `gorm:"foreignKey:PasskeyUserID"`
+
+func CreateNewUser(db *gorm.DB, user User) error {
+	if err := db.Create(&user).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+func FetchUser(db *gorm.DB, id uuid.UUID) (*User, error) {
+	var user User
+	if err := db.First(&user, id).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func UpdateUser(db *gorm.DB, user User) (*User, error) {
+	if err := db.Save(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 // WebAuthnID provides the user handle of the user account. A user handle is an opaque byte sequence with a maximum
@@ -24,7 +53,7 @@ type User struct {
 //
 // Specification: §5.4.3. User Account Parameters for Credential Generation (https://w3c.github.io/webauthn/#dom-publickeycredentialuserentity-id)
 func (u User) WebAuthnID() []byte {
-	uid, _ := base64.RawURLEncoding.DecodeString(u.PasskeyUserId)
+	uid, _ := base64.RawURLEncoding.DecodeString(u.PasskeyUserID)
 	return uid
 }
 

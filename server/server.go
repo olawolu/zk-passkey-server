@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/gorilla/mux"
-	"github.com/olawolu/zk-pass/data"
+	"github.com/olawolu/zk-pass/database"
 	"github.com/olawolu/zk-pass/logger"
 )
 

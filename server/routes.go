@@ -10,7 +10,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/gorilla/mux"
-	"github.com/olawolu/zk-pass/data"
+	"github.com/olawolu/zk-pass/database"
 	"github.com/olawolu/zk-pass/logger"
 )
 
@@ -68,7 +68,7 @@ func beginRegistration(
 		if err != nil {
 			logger.Error(r.Context(), err.Error())
 		}
-		sessionStore.SaveSession(w, r, session, user.UserId.String())
+		sessionStore.SaveSession(w, r, session, user.ID.String())
 		encodeJsonValue(w, http.StatusOK, creationOptions) // return the options generated
 	}
 }
@@ -101,7 +101,7 @@ func finishRegistration(
 			return
 		}
 
-		err = datastore.AddCredential(credential, user.UserId, r.UserAgent())
+		err = datastore.AddCredential(credential, user.ID, r.UserAgent())
 		if err != nil {
 			logger.Error(r.Context(), err.Error())
 			// Handle Error and return.
@@ -149,7 +149,7 @@ func beginLogin(
 			return
 		}
 		// store the session values
-		sessionStore.SaveSession(w, r, session, fmt.Sprintf("%s-%s", user.UserId, user.PasskeyUserId))
+		sessionStore.SaveSession(w, r, session, fmt.Sprintf("%s-%s", user.ID, user.PasskeyUserID))
 
 		encodeJsonValue(w, http.StatusOK, options) // return the options generated
 		// optionpublicKey contain our registration options
@@ -190,8 +190,6 @@ func finishLogin(
 		// If login was successful, update the credential object
 		// Pseudocode to update the user credential.
 		user.UpdateCredential(credential)
-		datastore.SaveUser(user)
-
 		encodeJsonValue(w, http.StatusOK, "Login Success")
 	}
 }

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/olawolu/zk-pass/data"
+	"github.com/olawolu/zk-pass/database"
 	"github.com/olawolu/zk-pass/logger"
 	"github.com/olawolu/zk-pass/server"
 )

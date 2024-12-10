@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
-	"github.com/olawolu/zk-pass/data/models"
+	"github.com/olawolu/zk-pass/database/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -25,34 +25,29 @@ func NewDB(dbUrl string) *DB {
 	return &DB{db}
 }
 
-func (db *DB) RegisterNewUser(username string) (*User, error) {
-	newUser := models.User{
-		Username: username,
-	}
-	u, err := models.CreateNewUser(db.DB, newUser)
-	if err != nil {
-		return nil, err
-	}
-
+func (db *DB) RegisterNewUser(username string) (*models.User, error) {
 	// create 64 byte webauthn user id
 	webauthnUserID := make([]byte, 64)
-	_, err = rand.Read(webauthnUserID)
+	_, err := rand.Read(webauthnUserID)
 	if err != nil {
 		return nil, fmt.Errorf("error generating webauthn user id: %v", err)
 	}
 	// conver webauthnUserID into a string
 	webauthnUserIDStr := base64.RawURLEncoding.EncodeToString(webauthnUserID)
-	newUser.PasskeyUserID = webauthnUserIDStr
-
-	return &User{
-		UserId:        u.ID,
+	newUser := models.User{
+		ID:            uuid.New(),
 		Username:      username,
-		PasskeyUserId: webauthnUserIDStr,
-	}, nil
+		PasskeyUserID: webauthnUserIDStr,
+	}
+	err = models.CreateNewUser(db.DB, newUser)
+	if err != nil {
+		return nil, err
+	}
+
+	return &newUser, nil
 }
 
-func (db *DB) GetUser(id string) (*User, error) {
-	var user *User
+func (db *DB) GetUser(id string) (*models.User, error) {
 	// fetch user
 	uid, err := base64.RawURLEncoding.DecodeString(id)
 	if err != nil {
@@ -67,25 +62,13 @@ func (db *DB) GetUser(id string) (*User, error) {
 		return nil, fmt.Errorf("error fetching user %v from db: %v", id, err)
 	}
 
-	user = &User{
-		UserId:        userId,
-		Username:      u.Username,
-		PasskeyUserId: u.PasskeyUserID,
-	}
-	return user, nil
+	return u, nil
 }
 
-func (db *DB) SaveUser(user *User) error {
-	u, err := models.FetchUser(db.DB, user.UserId)
+func (db *DB) SaveUser(user models.User) error {
+	_, err := models.UpdateUser(db.DB, user)
 	if err != nil {
-		return fmt.Errorf("error fetching user %v from db: %v", user.UserId, err)
-	}
-
-	u.Username = user.Username
-	u.PasskeyUserID = user.PasskeyUserId
-	_, err = models.UpdateUser(db.DB, *u)
-	if err != nil {
-		return fmt.Errorf("error updating user %v in db: %v", user.UserId, err)
+		return fmt.Errorf("error updating user %v in db: %v", user.ID, err)
 	}
 	return nil
 }
