@@ -116,7 +116,7 @@ func (db *DB) AddCredential(credential *webauthn.Credential, userId uuid.UUID, n
 	}
 
 	if err := models.CreateNewCredentials(db.DB, newCredential); err != nil {
-		return fmt.Errorf("error saving credentials", err)
+		return fmt.Errorf("error saving credentials: %v", err)
 	}
 	return nil
 }

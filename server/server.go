@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/gorilla/mux"
-	"github.com/olawolu/zk-pass/database"
+	data "github.com/olawolu/zk-pass/database"
 	"github.com/olawolu/zk-pass/logger"
 )
 
@@ -15,11 +15,28 @@ type Config struct {
 	webauthn *webauthn.Config
 }
 
-func ServerConfig(host, port string) *Config {
+// ServerConfig creates a new server configuration with the provided parameters.
+//
+// Parameters:
+// - host: The hostname for the server.
+// - port: The port number for the server.
+// - rpDisplayName: The display name for your site, used in WebAuthn requests.
+// - rpId: The relying party identifier, generally the fully qualified domain name (FQDN) for your site.
+// - rpOrigins: A list of origin URLs allowed for WebAuthn requests.
+//
+// Returns:
+// - A pointer to a Config struct containing the server configuration.
+func ServerConfig(
+	host string,
+	port string,
+	rpDisplayName string,
+	rpId string,
+	rpOrigins []string,
+) *Config {
 	wconfig := &webauthn.Config{
-		RPDisplayName: "Go Webauthn",                               // Display Name for your site
-		RPID:          "go-webauthn.local",                         // Generally the FQDN for your site
-		RPOrigins:     []string{"https://login.go-webauthn.local"}, // The origin URLs allowed for WebAuthn requests
+		RPDisplayName: rpDisplayName,
+		RPID:          rpId,
+		RPOrigins:     rpOrigins,
 	}
 	return &Config{
 		Host:     host,

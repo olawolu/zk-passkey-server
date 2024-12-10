@@ -8,11 +8,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/olawolu/zk-pass/database"
+	data "github.com/olawolu/zk-pass/database"
 	"github.com/olawolu/zk-pass/logger"
 	"github.com/olawolu/zk-pass/server"
 )
@@ -37,12 +38,19 @@ func run(
 	host := getenv("HOST")
 	port := getenv("PORT")
 	dbUrl := getenv("DATABASE_URL")
+	rpName := getenv("RP_DISPLAY_NAME")
+	rpId := getenv("RP_ID")
+	rpOrigins := strings.Split(getenv("RP_ORIGINS"), ",")
 
-	// setup databse
-	logger := logger.NewLogger()
-
-	config := server.ServerConfig(host, port)
 	database := data.NewDB(dbUrl)
+	logger := logger.NewLogger()
+	config := server.ServerConfig(
+		host,
+		port,
+		rpName,
+		rpId,
+		rpOrigins,
+	)
 	serverInstance := server.NewServer(config, logger, database)
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort(config.Host, config.Port),
