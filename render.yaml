@@ -1,0 +1,29 @@
+databases:
+  - name: zk-passkey-db
+    plan: starter
+  
+services:
+  - name: zk-passkey-server
+    type: web
+    runtime: go
+    region: oregon
+    buildCommand: ./render-build.sh
+    startCommand: ./passkey-server
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: zk-passkey-db
+          property: connectionString
+      - key: APP_ENV
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GITHUB_USER
+        sync: false
+      - key: RP_DISPLAY_NAME
+        sync: false
+      - key: RP_ID
+        sync: false
+      - key: RP_ORIGINS
+        sync: false

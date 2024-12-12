@@ -65,7 +65,7 @@ func run(
 	}
 
 	go func() {
-		slog.Info(fmt.Sprintf("listening on %s\n", httpServer.Addr))
+		slog.Info(fmt.Sprintf("server listening on %s\n", httpServer.Addr))
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			fmt.Fprintf(os.Stderr, "error listening and serving: %s\n", err)
 		}
@@ -82,7 +82,7 @@ func run(
 		if err := httpServer.Shutdown(shutdownCtx); err != nil {
 			fmt.Fprintf(os.Stderr, "error shutting down http server: %s\n", err)
 		}
-		fmt.Println("shutting down server")
+		fmt.Println("\nshutting down server")
 	}()
 	wg.Wait()
 
