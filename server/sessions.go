@@ -5,32 +5,27 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/antonlindstrom/pgstore"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/gorilla/sessions"
 )
 
 type SessionManager struct {
-	store *pgstore.PGStore
+	store sessions.Store
 }
 
-func NewSessionManager() *SessionManager {
-	store, err := pgstore.NewPGStore("postgres://user:password@127.0.0.1:5432/database?sslmode=verify-full", []byte("secret-key"))
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-
+func NewSessionManager(store sessions.Store) *SessionManager {
 	return &SessionManager{
 		store: store,
 	}
 }
-func (sm *SessionManager) GetSession(r *http.Request, key string) webauthn.SessionData {
+func (sm *SessionManager) GetSession(r *http.Request, key string) (*webauthn.SessionData, error) {
 	session, err := sm.store.Get(r, key)
 	if err != nil {
-		log.Fatalf(err.Error())
+		return nil, err
 	}
 
-	return storeValueToSessionData(session.Values)
+	return storeValueToSessionData(session.Values), nil
 }
 
 func (sm *SessionManager) SaveSession(w http.ResponseWriter, r *http.Request, sessionData *webauthn.SessionData, key string) {
@@ -55,9 +50,9 @@ func (sm *SessionManager) SaveSession(w http.ResponseWriter, r *http.Request, se
 }
 
 // func sessionDataToStoreValues(sessionData *webauthn.SessionData) values map[interface{}]interface{}
-func storeValueToSessionData(values map[interface{}]interface{}) webauthn.SessionData {
+func storeValueToSessionData(values map[interface{}]interface{}) *webauthn.SessionData {
 	// userVerification, _ :=
-	return webauthn.SessionData{
+	return &webauthn.SessionData{
 		Challenge:            values["challenge"].(string),
 		RelyingPartyID:       values["rp"].(string),
 		UserID:               values["user_id"].([]byte),

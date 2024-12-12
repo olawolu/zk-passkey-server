@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 	"net"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/antonlindstrom/pgstore"
 	"github.com/joho/godotenv"
 	data "github.com/olawolu/zk-pass/database"
 	"github.com/olawolu/zk-pass/logger"
@@ -51,7 +53,12 @@ func run(
 		rpId,
 		rpOrigins,
 	)
-	serverInstance := server.NewServer(config, logger, database)
+	store, err := pgstore.NewPGStore(dbUrl)
+	sessionStore := server.NewSessionManager(store)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	serverInstance := server.NewServer(config, logger, database, sessionStore)
 	httpServer := &http.Server{
 		Addr:    net.JoinHostPort(config.Host, config.Port),
 		Handler: serverInstance,

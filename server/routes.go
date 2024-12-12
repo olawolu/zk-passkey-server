@@ -14,14 +14,29 @@ import (
 	"github.com/olawolu/zk-pass/logger"
 )
 
+type Response struct {
+	Code    int    `json:"code"`
+	Data    any    `json:"data,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+func fmtResponse(code int, message string, data any) Response {
+	return Response{
+		Code:    code,
+		Data:    data,
+		Message: message,
+	}
+}
 func initRoutes(
 	mux *mux.Router,
 	config *Config,
-	datastore *data.DB,
+	datastore *database.DB,
 	sessionStore *SessionManager,
 	logger *logger.Logger,
 ) {
-	mux.Handle("/", http.NotFoundHandler())
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "zk-passkey server")
+	})
 
 	// register a new passkey
 	registry := mux.PathPrefix("/register").Subrouter()
@@ -29,16 +44,16 @@ func initRoutes(
 	registry.HandleFunc("/finish/{userId}", finishRegistration(config, datastore, sessionStore, logger))
 
 	// authenticate registered passkeys
-	auth := mux.PathPrefix("login").Subrouter()
+	auth := mux.PathPrefix("/login").Subrouter()
 	auth.HandleFunc("/initiate/{userId}", beginLogin(config, datastore, sessionStore, logger))
 	auth.HandleFunc("/finish/{userId}", finishLogin(config, datastore, sessionStore, logger))
 }
 
 func beginRegistration(
 	config *Config,
-	datastore *data.DB,
+	datastore *database.DB,
 	sessionStore *SessionManager,
-	logger *logger.Logger,
+	log *logger.Logger,
 ) http.HandlerFunc {
 	type registrationOptions struct {
 		username string
@@ -46,27 +61,34 @@ func beginRegistration(
 	return func(w http.ResponseWriter, r *http.Request) {
 		regOpts, err := decodeRequestBody[registrationOptions](r)
 		if err != nil {
-			logger.Error(r.Context(), err.Error())
-			encodeJsonValue(w, http.StatusInternalServerError, err.Error())
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
 			return
 		}
 
 		user, err := datastore.RegisterNewUser(regOpts.username)
 		if err != nil {
-			logger.Error(r.Context(), err.Error())
-			encodeJsonValue(w, http.StatusInternalServerError, err.Error())
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
 			return
 		}
 
 		webAuthn, err := webauthn.New(config.webauthn)
 		if err != nil {
-			logger.Error(r.Context(), err.Error())
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
 			return
 		}
 
 		creationOptions, session, err := webAuthn.BeginRegistration(user)
 		if err != nil {
-			logger.Error(r.Context(), err.Error())
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
+			return
 		}
 		sessionStore.SaveSession(w, r, session, user.ID.String())
 		encodeJsonValue(w, http.StatusOK, creationOptions) // return the options generated
@@ -75,36 +97,52 @@ func beginRegistration(
 
 func finishRegistration(
 	config *Config,
-	datastore *data.DB,
+	datastore *database.DB,
 	sessionStore *SessionManager,
-	logger *logger.Logger,
+	log *logger.Logger,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		params := mux.Vars(r)
 		userId := params["userId"]
 
-		user, _ := datastore.GetUser(userId) // Get the user
+		user, err := datastore.GetUser(userId) // Get the user
+		if err != nil {
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
+			return
+		}
 
 		// Get the session data stored from the function above
-		session := sessionStore.GetSession(r, userId)
+		session, err := sessionStore.GetSession(r, userId)
+		if err != nil {
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
+			return
+		}
 
 		webAuthn, err := webauthn.New(config.webauthn)
 		if err != nil {
-			logger.Error(r.Context(), err.Error())
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
 			return
 		}
 		protocol.ParseCredentialCreationResponseBody(r.Body)
-		credential, err := webAuthn.FinishRegistration(user, session, r)
+		credential, err := webAuthn.FinishRegistration(user, *session, r)
 		if err != nil {
-			logger.Error(r.Context(), err.Error())
-			// Handle Error and return.
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
 			return
 		}
 
 		err = datastore.AddCredential(credential, user.ID, r.UserAgent())
 		if err != nil {
-			logger.Error(r.Context(), err.Error())
-			// Handle Error and return.
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
 			return
 		}
 		encodeJsonValue(w, http.StatusOK, "Registration Success") // Handle next steps
@@ -113,9 +151,9 @@ func finishRegistration(
 
 func beginLogin(
 	config *Config,
-	datastore *data.DB,
+	datastore *database.DB,
 	sessionStore *SessionManager,
-	logger *logger.Logger,
+	log *logger.Logger,
 ) http.HandlerFunc {
 	type loginOptions struct {
 		hashedTxIntent string
@@ -126,14 +164,22 @@ func beginLogin(
 
 		// loginOpts, err := decodeRequestBody[loginOptions](r)
 		// if err != nil {
-		// 	logger.Error(r.Context(),err.Error())
+		// 	log.Logger.ErrorContext(r.Context(),err.Error())
 		// }
 
-		user, _ := datastore.GetUser(userId) // Find the user
+		user, err := datastore.GetUser(userId) // Find the user
+		if err != nil {
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
+			return
+		}
 
 		webAuthn, err := webauthn.New(config.webauthn)
 		if err != nil {
-			logger.Error(r.Context(), err.Error())
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
 			return
 		}
 
@@ -145,7 +191,9 @@ func beginLogin(
 		options, session, err := webAuthn.BeginLogin(user)
 		if err != nil {
 			// Handle Error and return.
-			logger.Error(r.Context(), err.Error())
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
 			return
 		}
 		// store the session values
@@ -158,9 +206,9 @@ func beginLogin(
 
 func finishLogin(
 	config *Config,
-	datastore *data.DB,
+	datastore *database.DB,
 	sessionStore *SessionManager,
-	logger *logger.Logger,
+	log *logger.Logger,
 ) http.HandlerFunc {
 	type loginOptions struct {
 		userId  string
@@ -169,19 +217,39 @@ func finishLogin(
 	return func(w http.ResponseWriter, r *http.Request) {
 		loginOpts, err := decodeRequestBody[loginOptions](r)
 		if err != nil {
-			logger.Error(r.Context(), err.Error())
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
+			return
 		}
-		user, _ := datastore.GetUser(loginOpts.userId)
-		session := sessionStore.GetSession(r, loginOpts.passkey)
+		user, err := datastore.GetUser(loginOpts.userId)
+		if err != nil {
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
+			return
+		}
+
+		session, err := sessionStore.GetSession(r, loginOpts.passkey)
+		if err != nil {
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
+			return
+		}
 
 		webAuthn, err := webauthn.New(config.webauthn)
 		if err != nil {
-			fmt.Println(err)
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
 			return
 		}
-		credential, err := webAuthn.FinishLogin(user, session, r)
+		credential, err := webAuthn.FinishLogin(user, *session, r)
 		if err != nil {
-			logger.Error(r.Context(), err.Error())
+			log.Logger.ErrorContext(r.Context(), err.Error())
+			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
+			encodeJsonValue[Response](w, http.StatusInternalServerError, response)
 			return
 		}
 
@@ -194,13 +262,13 @@ func finishLogin(
 	}
 }
 
-func encodeJsonValue[T any](w http.ResponseWriter, status int, v T) error {
+func encodeJsonValue[T any](w http.ResponseWriter, status int, v T) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		return fmt.Errorf("encode json: %w", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
-	return nil
 }
 
 func decodeRequestBody[T any](r *http.Request) (T, error) {

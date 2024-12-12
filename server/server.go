@@ -49,10 +49,10 @@ func NewServer(
 	config *Config,
 	logger *logger.Logger,
 	datastore *data.DB,
+	sessionStore *SessionManager,
 ) http.Handler {
 	mux := mux.NewRouter()
-	// sessionStore := NewSessionManager()
-	initRoutes(mux, config, datastore, nil, logger)
+	initRoutes(mux, config, datastore, sessionStore, logger)
 
 	var handler http.Handler = mux
 	// add some middleware

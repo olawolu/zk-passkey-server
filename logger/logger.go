@@ -23,19 +23,19 @@ func NewLogger() *Logger {
 }
 
 func (l *Logger) Debug(ctx context.Context, msg string, args ...any) {
-	l.Logger.Debug(msg, args...)
+	l.Logger.DebugContext(ctx, msg, args...)
 }
 
 func (l *Logger) Info(ctx context.Context, msg string, args ...any) {
-	l.Logger.Info(msg, args...)
+	l.Logger.InfoContext(ctx, msg, args...)
 }
 
 func (l *Logger) Error(ctx context.Context, msg string, args ...any) {
-	l.Logger.Error(msg, args...)
+	l.Logger.ErrorContext(ctx, msg, args...)
 }
 
 func (l *Logger) Warn(ctx context.Context, msg string, args ...any) {
-	l.Logger.Warn(msg, args...)
+	l.Logger.WarnContext(ctx, msg, args...)
 }
 
 // func (l *Logger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
