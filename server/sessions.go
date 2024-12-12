@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -22,16 +22,18 @@ func NewSessionManager(store sessions.Store) *SessionManager {
 func (sm *SessionManager) GetSession(r *http.Request, key string) (*webauthn.SessionData, error) {
 	session, err := sm.store.Get(r, key)
 	if err != nil {
+		err = fmt.Errorf("failed to get session: %w", err)
 		return nil, err
 	}
 
 	return storeValueToSessionData(session.Values), nil
 }
 
-func (sm *SessionManager) SaveSession(w http.ResponseWriter, r *http.Request, sessionData *webauthn.SessionData, key string) {
+func (sm *SessionManager) SaveSession(w http.ResponseWriter, r *http.Request, sessionData *webauthn.SessionData, key string) error {
 	session, err := sm.store.Get(r, key)
 	if err != nil {
-		log.Fatalf(err.Error())
+		err = fmt.Errorf("failed to get session: %w", err)
+		return err
 	}
 
 	session.Values["challenge"] = sessionData.Challenge
@@ -44,9 +46,10 @@ func (sm *SessionManager) SaveSession(w http.ResponseWriter, r *http.Request, se
 
 	session.Options.MaxAge = 0
 	if err = session.Save(r, w); err != nil {
-		log.Fatalf("Error saving session: %v", err)
+		err = fmt.Errorf("failed to save session: %w", err)
+		return err
 	}
-
+	return nil
 }
 
 // func sessionDataToStoreValues(sessionData *webauthn.SessionData) values map[interface{}]interface{}
