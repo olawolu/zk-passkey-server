@@ -1,6 +1,6 @@
 databases:
   - name: zk-passkey-db
-    plan: starter
+    plan: free
   
 services:
   - name: zk-passkey-server
