@@ -102,6 +102,8 @@ func setEnv(appEnv string) error {
 		// overloadSpecificEnv(".env.test.local")
 	case "production":
 		// env should already be set
+	case "development":
+
 	default:
 		if err := loadBaseEnv(); err != nil {
 			return err
