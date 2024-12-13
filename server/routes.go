@@ -14,6 +14,35 @@ import (
 	"github.com/olawolu/zk-pass/logger"
 )
 
+type RouteDoc struct {
+    Path        string `json:"path"`
+    Method      string `json:"method"`
+    Description string `json:"description"`
+}
+
+var apiDocs = []RouteDoc{
+    {
+        Path:        "/register/initiate",
+        Method:      "POST",
+        Description: "Begin WebAuthn registration process. Returns credential creation options.",
+    },
+    {
+        Path:        "/register/finish/{userId}",
+        Method:      "POST", 
+        Description: "Complete registration with attestation from authenticator.",
+    },
+    {
+        Path:        "/login/initiate/{userId}",
+        Method:      "POST",
+        Description: "Begin WebAuthn authentication. Returns assertion options.",
+    },
+    {
+        Path:        "/login/finish/{userId}",
+        Method:      "POST",
+        Description: "Complete authentication with assertion from authenticator.",
+    },
+}
+
 type Response struct {
 	Code    int    `json:"code"`
 	Data    any    `json:"data,omitempty"`
@@ -27,6 +56,7 @@ func fmtResponse(code int, message string, data any) Response {
 		Message: message,
 	}
 }
+
 func initRoutes(
 	mux *mux.Router,
 	config *Config,
@@ -35,7 +65,36 @@ func initRoutes(
 	logger *logger.Logger,
 ) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "zk-passkey server")
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `
+		<html>
+			<head>
+				<title>ZK-Passkey Server</title>
+				<style>
+					body { font-family: system-ui; max-width: 800px; margin: 0 auto; padding: 2rem; }
+					.route { border: 1px solid #eee; padding: 1rem; margin: 1rem 0; border-radius: 4px; }
+					.method { font-weight: bold; color: #0066cc; }
+					.path { font-family: monospace; }
+				</style>
+			</head>
+			<body>
+				<h1>ZK-Passkey Server API</h1>
+		`)
+	
+		for _, doc := range apiDocs {
+			fmt.Fprintf(w, `
+				<div class="route">
+					<span class="method">%s</span>
+					<span class="path">%s</span>
+					<p>%s</p>
+				</div>
+			`, doc.Method, doc.Path, doc.Description)
+		}
+	
+		fmt.Fprint(w, `
+			</body>
+		</html>
+		`)
 	})
 
 	// register a new passkey
