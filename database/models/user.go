@@ -19,6 +19,10 @@ type User struct {
 	PublicKeyCredentials []PublicKeyCredential `gorm:"foreignKey:PasskeyUserID"`
 }
 
+func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
+	u.ID = uuid.New()
+	return
+}
 // PublicKeyCredential []PublicKeyCredential `gorm:"foreignKey:PasskeyUserID"`
 
 func CreateNewUser(db *gorm.DB, user User) error {

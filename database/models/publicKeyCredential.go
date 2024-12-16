@@ -17,13 +17,18 @@ type PublicKeyCredential struct {
 	PasskeyUserID         string // represented by user.id in registration options
 	PublicKey             string
 	AttestationType       string
-	Transports            pq.StringArray
+	Transports            pq.StringArray        `gorm:"type:text[]"`
 	CredentialFlags       CredentialFlags       `gorm:"foreignKey:PublicKeyCredentialId;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	Authenticator         Authenticator         `gorm:"foreignKey:PublicKeyCredentialId;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	CredentialAttestation CredentialAttestation `gorm:"foreignKey:PublicKeyCredentialId;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 	DeletedAt             gorm.DeletedAt `gorm:"index"`
+}
+
+func (p *PublicKeyCredential) BeforeCreate(tx *gorm.DB) (err error) {
+	p.ID = uuid.New()
+	return
 }
 
 type CredentialFlags struct {
