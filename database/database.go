@@ -22,6 +22,9 @@ func NewDB(dbUrl string) *DB {
 		panic(fmt.Errorf("error connecting to db: %v", err))
 	}
 
+	if err = db.AutoMigrate(&models.User{}, models.PublicKeyCredential{}); err != nil {
+		panic(fmt.Errorf("error migrating db: %v", err))
+	}
 	return &DB{db}
 }
 
