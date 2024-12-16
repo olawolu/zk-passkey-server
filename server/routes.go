@@ -115,7 +115,7 @@ func beginRegistration(
 	log *logger.Logger,
 ) http.HandlerFunc {
 	type registrationOptions struct {
-		username string
+		Username string `json:"username"`
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		regOpts, err := decodeRequestBody[registrationOptions](r)
@@ -126,7 +126,7 @@ func beginRegistration(
 			return
 		}
 
-		user, err := datastore.RegisterNewUser(regOpts.username)
+		user, err := datastore.RegisterNewUser(regOpts.Username)
 		if err != nil {
 			log.Logger.ErrorContext(r.Context(), err.Error())
 			response := fmtResponse(http.StatusInternalServerError, err.Error(), nil)
